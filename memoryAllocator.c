@@ -3,7 +3,6 @@
 #include <string.h>
 #include <pthread.h>
 
-
 typedef char ALIGN[16];
 // we are using align to make page align to 16 bytes
 union header {
@@ -48,7 +47,7 @@ void *malloc(size_t size)
 	pthread_mutex_lock(&global_malloc_lock);
 
 	header = get_free_block(size);
-
+	//printf("using malloc");
 	if(header)
 	{
 		header->s.is_free = 0;
@@ -106,3 +105,40 @@ void free(void *block)
 	header->s.is_free = 1;
 	pthread_mutex_unlock(&global_malloc_lock);
 }
+
+void *calloc(size_t num, size_t nsize)
+{
+	size_t size;
+	void *block;
+	if (!num || !nsize)
+		return NULL;
+	size = num * nsize;
+	/* check mul overflow */
+	if (nsize != size / num)
+		return NULL;
+	block = malloc(size);
+	if (!block)
+		return NULL;
+	memset(block, 0, size);
+	return block;
+}
+
+void *realloc(void *block, size_t size)
+{
+	header_t *header;
+	void *ret;
+	if (!block || !size)
+		return malloc(size);
+	header = (header_t*)block - 1;
+	if (header->s.size >= size)
+		return block;
+	ret = malloc(size);
+	if (ret) {
+		/* Relocate contents to the new bigger block */
+		memcpy(ret, block, header->s.size);
+		/* Free the old memory block */
+		free(block);
+	}
+	return ret;
+}
+
